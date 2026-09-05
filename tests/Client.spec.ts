@@ -193,10 +193,23 @@ describe("Client", function () {
             const client = new Client("test_base_url", null, "test_language_A");
             const result = client.filter("a > {:test1} && b = {:test2} || c = {:test2}", {
                 test0: "abc", // no such placeholder
-                test2: `test$$`, // last chars ensures correct special chars replacement
+                test2: `test$$`, // last chars ensure correct special chars replacement
             });
 
             assert.equal(result, `a > {:test1} && b = "test$$" || c = "test$$"`);
+        });
+
+        test("filter with param values matching the placeholders (regex chaining)", function () {
+            const client = new Client("test_base_url", null, "test_language_A");
+            const raw = "a > {:test1} && b = {:test2} || c = {:test3}";
+
+            const result = client.filter("a > {:test1} && b = {:test2} || c = {:test3}", {
+                test1: "{:test2}",
+                test2: "{:test1}",
+                test3: "{:test3}",
+            });
+
+            assert.equal(result, `a > "{:test2}" && b = "{:test1}" || c = "{:test3}"`);
         });
 
         test("filter expression with all placeholder types", function () {
