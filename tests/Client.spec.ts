@@ -182,13 +182,21 @@ describe("Client", function () {
             assert.equal(client.filter(raw), raw);
         });
 
-        test("filter expression with params that does not match the placeholders", function () {
+        test("filter expression with empty params", function () {
+            const client = new Client("test_base_url", null, "test_language_A");
+            const raw = "a > {:test1} && b = {:test2} || c = {:test2}";
+
+            assert.equal(client.filter(raw, {}), raw);
+        });
+
+        test("filter expression with partial params and special regex chars", function () {
             const client = new Client("test_base_url", null, "test_language_A");
             const result = client.filter("a > {:test1} && b = {:test2} || c = {:test2}", {
-                test2: "hello",
+                test0: "abc", // no such placeholder
+                test2: `test$$`, // last chars ensures correct special chars replacement
             });
 
-            assert.equal(result, `a > {:test1} && b = "hello" || c = "hello"`);
+            assert.equal(result, `a > {:test1} && b = "test$$" || c = "test$$"`);
         });
 
         test("filter expression with all placeholder types", function () {

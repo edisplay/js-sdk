@@ -21,6 +21,14 @@ import {
 } from "@/tools/options";
 import { isFormData, convertToFormDataIfNeeded } from "@/tools/formdata";
 
+// @todo remove after upgrading the Node.js dev setup
+if (!((RegExp as any).escape)) {
+    // https://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript#answer-3561711
+    (RegExp as any).escape = function(str: string): string {
+        return str.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
+    }
+}
+
 export interface BeforeSendResult {
     [key: string]: any; // for backward compatibility
     url?: string;
@@ -296,7 +304,17 @@ export default class Client {
             return raw;
         }
 
-        function quotify(val: any): string {
+        const paramsWithPlaceholders: { [key: string]: any } = {}
+        for (const k in params) {
+            paramsWithPlaceholders["{:" + k + "}"] = params[k]
+        }
+
+        const pattern = Object.keys(paramsWithPlaceholders).map((k) => (RegExp as any).escape(k)).join("|")
+        if (!pattern) {
+            return raw // no params to replace
+        }
+
+        function stringify(val: any): string {
             switch (typeof val) {
                 case "boolean":
                 case "number":
@@ -306,26 +324,24 @@ export default class Client {
                 default:
                     if (val == null) {
                         return "null";
-                    } else if (val instanceof Date) {
-                        return JSON.stringify(val.toISOString().replace("T", " "));
-                    } else {
-                        const stringified = JSON.stringify(val);
-
-                        // wrap in double quotes in case of regular array, object, etc.
-                        if (stringified.startsWith("[") || stringified.startsWith("{")) {
-                            return JSON.stringify(stringified);
-                        }
-
-                        return stringified;
                     }
+
+                    if (val instanceof Date) {
+                        return JSON.stringify(val.toISOString().replace("T", " "));
+                    }
+
+                    const stringified = JSON.stringify(val);
+
+                    // wrap in double quotes in case of regular array, object, etc.
+                    if (stringified.startsWith("[") || stringified.startsWith("{")) {
+                        return JSON.stringify(stringified);
+                    }
+
+                    return stringified;
             }
         }
 
-        for (let key in params) {
-            raw = raw.replaceAll("{:" + key + "}", quotify(params[key]));
-        }
-
-        return raw;
+        return raw.replace(new RegExp(pattern, "g"), (match) => stringify(paramsWithPlaceholders[match]))
     }
 
     /**
